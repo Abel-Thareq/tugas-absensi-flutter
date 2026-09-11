@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "617171741723",
+    "project_id": "absensitugas4-abel",
+    "storage_bucket": "absensitugas4-abel.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:617171741723:android:7f7506a1b782736a075cbe",
+        "android_client_info": {
+          "package_name": "com.perusahaan.presensi.presensi_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDG2I2nQrNVe8DduUbZiMBegXDzJG2nAuo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
