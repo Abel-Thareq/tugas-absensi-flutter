@@ -15,19 +15,23 @@ class AttendanceProvider extends ChangeNotifier {
   bool _isLoadingHistory = false;
   bool _isGettingLocation = false;
   bool _isSubmittingCheckIn = false;
+  bool _isSubmittingCheckOut = false;
 
   LocationResult? _currentLocationResult;
   String? _errorMessage;
 
   AttendanceModel? get todayAttendance => _todayAttendance;
   bool get hasCheckedInToday => _todayAttendance != null;
+  bool get hasCheckedOutToday => _todayAttendance?.hasCheckedOut ?? false;
+  bool get isTodayFullyCompleted => hasCheckedInToday && hasCheckedOutToday;
   List<AttendanceModel> get historyList => _historyList;
 
   bool get isLoadingToday => _isLoadingToday;
   bool get isLoadingHistory => _isLoadingHistory;
   bool get isGettingLocation => _isGettingLocation;
   bool get isSubmittingCheckIn => _isSubmittingCheckIn;
-  bool get isProcessing => _isGettingLocation || _isSubmittingCheckIn;
+  bool get isSubmittingCheckOut => _isSubmittingCheckOut;
+  bool get isProcessing => _isGettingLocation || _isSubmittingCheckIn || _isSubmittingCheckOut;
 
   LocationResult? get currentLocationResult => _currentLocationResult;
   String? get errorMessage => _errorMessage;
@@ -126,6 +130,60 @@ class AttendanceProvider extends ChangeNotifier {
     } catch (e) {
       _errorMessage = e.toString().replaceAll('Exception: ', '');
       _isSubmittingCheckIn = false;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  /// Submits verified attendance check-out to Firebase / Local Service
+  Future<AttendanceModel?> submitCheckOut(UserModel user) async {
+    if (!hasCheckedInToday) {
+      _errorMessage = 'Anda belum melakukan presensi masuk (check-in) hari ini.';
+      notifyListeners();
+      return null;
+    }
+
+    if (hasCheckedOutToday) {
+      _errorMessage = 'Anda sudah melakukan presensi keluar (check-out) hari ini pada pukul ${_todayAttendance?.checkOutTime}.';
+      notifyListeners();
+      return null;
+    }
+
+    final location = _currentLocationResult;
+    if (location == null) {
+      _errorMessage = 'Lokasi GPS belum didapatkan. Silakan periksa izin lokasi Anda.';
+      notifyListeners();
+      return null;
+    }
+
+    _isSubmittingCheckOut = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final updatedRecord = await _attendanceService.submitCheckOut(
+        user: user,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        locationName: location.locationName,
+      );
+
+      _todayAttendance = updatedRecord;
+
+      // Update history list item immediately
+      final index = _historyList.indexWhere((r) => r.id == updatedRecord.id);
+      if (index != -1) {
+        _historyList[index] = updatedRecord;
+      } else {
+        _historyList.insert(0, updatedRecord);
+      }
+
+      _isSubmittingCheckOut = false;
+      notifyListeners();
+      return updatedRecord;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _isSubmittingCheckOut = false;
       notifyListeners();
       return null;
     }

@@ -6,11 +6,13 @@ import '../../services/location_service.dart';
 class CheckInConfirmationSheet extends StatefulWidget {
   final LocationResult locationResult;
   final Future<void> Function() onConfirm;
+  final bool isCheckOut;
 
   const CheckInConfirmationSheet({
     super.key,
     required this.locationResult,
     required this.onConfirm,
+    this.isCheckOut = false,
   });
 
   @override
@@ -71,7 +73,7 @@ class _CheckInConfirmationSheetState extends State<CheckInConfirmationSheet> {
           const SizedBox(height: 18),
 
           Text(
-            'Confirm attendance',
+            widget.isCheckOut ? 'Konfirmasi Check-out' : 'Konfirmasi Check-in',
             style: theme.textTheme.headlineMedium?.copyWith(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -79,7 +81,9 @@ class _CheckInConfirmationSheetState extends State<CheckInConfirmationSheet> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Please verify your check-in parameters before committing.',
+            widget.isCheckOut
+                ? 'Pastikan jam dan koordinat presensi pulang sudah sesuai.'
+                : 'Pastikan jam dan koordinat presensi masuk sudah sesuai.',
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 20),
@@ -95,19 +99,19 @@ class _CheckInConfirmationSheetState extends State<CheckInConfirmationSheet> {
             child: Column(
               children: [
                 _buildRow(
-                  label: 'Date',
+                  label: 'Tanggal',
                   icon: Icons.calendar_today_outlined,
                   value: dateStr,
                 ),
                 const Divider(height: 18),
                 _buildRow(
-                  label: 'Time',
+                  label: widget.isCheckOut ? 'Jam Pulang' : 'Jam Masuk',
                   icon: Icons.access_time,
                   value: timeStr,
                 ),
                 const Divider(height: 18),
                 _buildRow(
-                  label: 'Location',
+                  label: 'Lokasi GPS',
                   icon: Icons.pin_drop_outlined,
                   value: coordsStr,
                   isMonospace: true,
@@ -121,7 +125,7 @@ class _CheckInConfirmationSheetState extends State<CheckInConfirmationSheet> {
                         Icon(Icons.check_circle_outline, size: 16, color: AppColors.textSecondary),
                         SizedBox(width: 8),
                         Text(
-                          'Status',
+                          'Tipe Presensi',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppColors.textSecondary,
@@ -137,17 +141,21 @@ class _CheckInConfirmationSheetState extends State<CheckInConfirmationSheet> {
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: AppColors.successBorder),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.done, size: 13, color: AppColors.success),
-                          SizedBox(width: 4),
+                          Icon(
+                            widget.isCheckOut ? Icons.logout : Icons.login,
+                            size: 13,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 4),
                           Text(
-                            'Present',
-                            style: TextStyle(
+                            widget.isCheckOut ? 'Check-out (Pulang)' : 'Check-in (Masuk)',
+                            style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.success,
+                              color: AppColors.primary,
                             ),
                           ),
                         ],
@@ -174,7 +182,7 @@ class _CheckInConfirmationSheetState extends State<CheckInConfirmationSheet> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Tamper-proof record synced with Firebase server time. Coordinates cryptographically attached.',
+                    'Data tersinkronisasi dengan Firebase Cloud Firestore dan waktu server yang tidak dapat dimanipulasi.',
                     style: TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
@@ -191,10 +199,10 @@ class _CheckInConfirmationSheetState extends State<CheckInConfirmationSheet> {
           ElevatedButton(
             onPressed: _isSubmitting ? null : _handleConfirm,
             child: _isSubmitting
-                ? const Row(
+                ? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SizedBox(
+                      const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
@@ -202,16 +210,16 @@ class _CheckInConfirmationSheetState extends State<CheckInConfirmationSheet> {
                           color: Colors.white,
                         ),
                       ),
-                      SizedBox(width: 12),
-                      Text('Recording attendance...'),
+                      const SizedBox(width: 12),
+                      Text(widget.isCheckOut ? 'Menyimpan check-out...' : 'Menyimpan check-in...'),
                     ],
                   )
-                : const Text('Confirm check-in'),
+                : Text(widget.isCheckOut ? 'Konfirmasi Check-out' : 'Konfirmasi Check-in'),
           ),
           const SizedBox(height: 10),
           OutlinedButton(
             onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: const Text('Batal'),
           ),
         ],
       ),

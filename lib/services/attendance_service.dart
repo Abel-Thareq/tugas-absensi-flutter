@@ -131,6 +131,63 @@ class AttendanceService {
     }
   }
 
+  /// Submit attendance check-out
+  Future<AttendanceModel> submitCheckOut({
+    required UserModel user,
+    required double latitude,
+    required double longitude,
+    required String locationName,
+  }) async {
+    final now = DateTime.now();
+    final timeStr = DateFormat('hh:mm a').format(now);
+
+    final existing = await getTodayAttendance(user.id);
+    if (existing == null) {
+      throw Exception('Anda belum melakukan presensi masuk (check-in) hari ini.');
+    }
+    if (existing.hasCheckedOut) {
+      throw Exception('Anda sudah melakukan presensi keluar (check-out) hari ini pada pukul ${existing.checkOutTime}.');
+    }
+
+    final updatedRecord = existing.copyWith(
+      checkOutTime: timeStr,
+      checkOutLatitude: latitude,
+      checkOutLongitude: longitude,
+      checkOutLocationName: locationName,
+      updatedAt: now,
+    );
+
+    if (_isFirebaseAvailable && _firestore != null) {
+      try {
+        await _firestore!
+            .collection(AppConstants.attendanceCollection)
+            .doc(existing.id)
+            .update({
+          'checkOutTime': timeStr,
+          'checkOutLatitude': latitude,
+          'checkOutLongitude': longitude,
+          'checkOutLocationName': locationName,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        _localRecords.removeWhere((r) => r.id == existing.id);
+        _localRecords.insert(0, updatedRecord);
+        await _saveLocalRecords(user.id);
+
+        return updatedRecord;
+      } catch (e) {
+        debugPrint('Firestore checkOut error: $e');
+        throw Exception('Gagal menyimpan check-out ke Firebase: ${e.toString()}');
+      }
+    } else {
+      await Future.delayed(const Duration(milliseconds: 600));
+      _localRecords.removeWhere((r) => r.id == existing.id);
+      _localRecords.insert(0, updatedRecord);
+      await _saveLocalRecords(user.id);
+      return updatedRecord;
+    }
+  }
+
   /// Get chronological attendance history for user
   Future<List<AttendanceModel>> getAttendanceHistory(String userId) async {
     if (_isFirebaseAvailable && _firestore != null) {
@@ -199,9 +256,12 @@ class AttendanceService {
         employeeId: AppConstants.demoEmployeeId,
         date: DateFormat('yyyy-MM-dd').format(yesterday),
         checkInTime: '08:07 AM',
+        checkOutTime: '05:04 PM',
         status: 'Present',
         latitude: AppConstants.defaultOfficeLatitude,
         longitude: AppConstants.defaultOfficeLongitude,
+        checkOutLatitude: AppConstants.defaultOfficeLatitude,
+        checkOutLongitude: AppConstants.defaultOfficeLongitude,
         locationName: 'Kantor Pusat • Terverifikasi',
         createdAt: yesterday,
       ),
@@ -211,9 +271,12 @@ class AttendanceService {
         employeeId: AppConstants.demoEmployeeId,
         date: DateFormat('yyyy-MM-dd').format(twoDaysAgo),
         checkInTime: '08:01 AM',
+        checkOutTime: '05:00 PM',
         status: 'Present',
         latitude: AppConstants.defaultOfficeLatitude,
         longitude: AppConstants.defaultOfficeLongitude,
+        checkOutLatitude: AppConstants.defaultOfficeLatitude,
+        checkOutLongitude: AppConstants.defaultOfficeLongitude,
         locationName: 'Kantor Pusat • Terverifikasi',
         createdAt: twoDaysAgo,
       ),
@@ -223,9 +286,12 @@ class AttendanceService {
         employeeId: AppConstants.demoEmployeeId,
         date: DateFormat('yyyy-MM-dd').format(threeDaysAgo),
         checkInTime: '08:05 AM',
+        checkOutTime: '05:08 PM',
         status: 'Present',
         latitude: AppConstants.defaultOfficeLatitude,
         longitude: AppConstants.defaultOfficeLongitude,
+        checkOutLatitude: AppConstants.defaultOfficeLatitude,
+        checkOutLongitude: AppConstants.defaultOfficeLongitude,
         locationName: 'Kantor Pusat • Terverifikasi',
         createdAt: threeDaysAgo,
       ),

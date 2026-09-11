@@ -72,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Anda sudah melakukan presensi hari ini pukul ${attendanceProvider.todayAttendance?.checkInTime}.',
+            'Anda sudah melakukan presensi masuk hari ini pukul ${attendanceProvider.todayAttendance?.checkInTime}.',
           ),
           backgroundColor: AppColors.secondary,
           behavior: SnackBarBehavior.floating,
@@ -90,14 +90,57 @@ class _HomeScreenState extends State<HomeScreen> {
         onContinue: () {
           final location = attendanceProvider.currentLocationResult;
           if (location != null && location.isSuccess) {
-            _showConfirmationSheet(location);
+            _showConfirmationSheet(location, isCheckOut: false);
           }
         },
       ),
     );
   }
 
-  void _showConfirmationSheet(dynamic locationResult) {
+  void _startCheckOutFlow() {
+    final attendanceProvider = context.read<AttendanceProvider>();
+
+    if (!attendanceProvider.hasCheckedInToday) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Anda belum melakukan presensi masuk (check-in) hari ini.'),
+          backgroundColor: AppColors.secondary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (attendanceProvider.hasCheckedOutToday) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Anda sudah melakukan presensi pulang hari ini pukul ${attendanceProvider.todayAttendance?.checkOutTime}.',
+          ),
+          backgroundColor: AppColors.secondary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) => LocationVerificationSheet(
+        onAcquireLocation: () => attendanceProvider.fetchCurrentLocation(),
+        onContinue: () {
+          final location = attendanceProvider.currentLocationResult;
+          if (location != null && location.isSuccess) {
+            _showConfirmationSheet(location, isCheckOut: true);
+          }
+        },
+      ),
+    );
+  }
+
+  void _showConfirmationSheet(dynamic locationResult, {bool isCheckOut = false}) {
     final authProvider = context.read<AuthProvider>();
     final attendanceProvider = context.read<AttendanceProvider>();
 
@@ -107,17 +150,21 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.transparent,
       builder: (confirmContext) => CheckInConfirmationSheet(
         locationResult: locationResult,
+        isCheckOut: isCheckOut,
         onConfirm: () async {
           final user = authProvider.user;
           if (user == null) return;
 
-          final record = await attendanceProvider.submitAttendance(user);
+          final record = isCheckOut
+              ? await attendanceProvider.submitCheckOut(user)
+              : await attendanceProvider.submitAttendance(user);
+
           if (confirmContext.mounted) {
             Navigator.of(confirmContext).pop();
           }
 
           if (record != null && mounted) {
-            _showSuccessDialog(record);
+            _showSuccessDialog(record, isCheckOut: isCheckOut);
           } else if (attendanceProvider.errorMessage != null && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -132,11 +179,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showSuccessDialog(AttendanceModel record) {
+  void _showSuccessDialog(AttendanceModel record, {bool isCheckOut = false}) {
     showDialog(
       context: context,
       builder: (dialogContext) => CheckInSuccessDialog(
         attendance: record,
+        isCheckOut: isCheckOut,
         onViewHistory: () {
           widget.onNavigateTab?.call(1);
         },
@@ -153,6 +201,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final formattedDayDate = DateFormat('EEEE, d MMMM yyyy').format(_currentTime);
     final formattedLiveTime = DateFormat('HH:mm:ss').format(_currentTime);
     final isCheckedIn = attendanceProvider.hasCheckedInToday;
+    final hasCheckedOut = attendanceProvider.hasCheckedOutToday;
+    final isCompleted = attendanceProvider.isTodayFullyCompleted;
     final todayRecord = attendanceProvider.todayAttendance;
 
     return Scaffold(
@@ -282,8 +332,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isCheckedIn ? AppColors.successBorder : AppColors.border,
-                    width: isCheckedIn ? 1.5 : 1.0,
+                    color: isCompleted
+                        ? AppColors.successBorder
+                        : (isCheckedIn ? AppColors.accent : AppColors.border),
+                    width: (isCheckedIn || isCompleted) ? 1.5 : 1.0,
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -307,13 +359,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                 width: 8,
                                 height: 8,
                                 decoration: BoxDecoration(
-                                  color: isCheckedIn ? AppColors.accent : AppColors.warning,
+                                  color: isCompleted
+                                      ? AppColors.primary
+                                      : (isCheckedIn ? AppColors.accent : AppColors.warning),
                                   shape: BoxShape.circle,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                isCheckedIn ? 'PRESENSI HARI INI SELESAI' : 'PRESENSI HARI INI',
+                                isCompleted
+                                    ? 'PRESENSI HARI INI SELESAI'
+                                    : (isCheckedIn
+                                        ? 'CHECK-IN AKTIF (SIAP PULANG)'
+                                        : 'PRESENSI HARI INI'),
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -326,18 +384,30 @@ class _HomeScreenState extends State<HomeScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: isCheckedIn ? AppColors.successBackground : AppColors.surfaceLow,
+                              color: isCompleted
+                                  ? AppColors.successBackground
+                                  : (isCheckedIn
+                                      ? AppColors.primaryContainer
+                                      : AppColors.surfaceLow),
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: isCheckedIn ? AppColors.successBorder : AppColors.border,
+                                color: isCompleted
+                                    ? AppColors.successBorder
+                                    : (isCheckedIn
+                                        ? AppColors.accent.withValues(alpha: 0.3)
+                                        : AppColors.border),
                               ),
                             ),
                             child: Text(
-                              isCheckedIn ? 'Hadir' : 'Belum Absen',
+                              isCompleted
+                                  ? 'Selesai'
+                                  : (isCheckedIn ? 'Sedang Bekerja' : 'Belum Absen'),
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: isCheckedIn ? AppColors.success : AppColors.textSecondary,
+                                color: isCompleted
+                                    ? AppColors.primary
+                                    : (isCheckedIn ? AppColors.primary : AppColors.textSecondary),
                               ),
                             ),
                           ),
@@ -365,13 +435,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      if (isCheckedIn && todayRecord != null) ...[
-                        // Checked in detail
+                      // CARD BODY BASED ON 3 STATES
+                      if (isCompleted && todayRecord != null) ...[
+                        // State 3: Both Check-in & Check-out Completed
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryContainer.withValues(alpha: 0.6),
+                            color: AppColors.primaryContainer.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: AppColors.successBorder),
                           ),
@@ -380,31 +451,49 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               Row(
                                 children: [
-                                  const Icon(Icons.check_circle, size: 16, color: AppColors.primary),
+                                  const Icon(Icons.login, size: 15, color: AppColors.primary),
                                   const SizedBox(width: 6),
                                   Text(
-                                    'Check-in tercatat pada pukul ${todayRecord.checkInTime}',
+                                    'Check-in: ${todayRecord.checkInTime}',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
                                       color: AppColors.primary,
                                     ),
                                   ),
+                                  const Spacer(),
+                                  Text(
+                                    todayRecord.coordinatesShort,
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontFamily: 'monospace',
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
                                 ],
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 8),
                               Row(
                                 children: [
-                                  const Icon(Icons.pin_drop, size: 14, color: AppColors.secondary),
+                                  const Icon(Icons.logout, size: 15, color: AppColors.secondary),
                                   const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      'Koordinat: ${todayRecord.coordinatesShort}',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontFamily: 'monospace',
-                                        color: AppColors.textSecondary,
-                                      ),
+                                  Text(
+                                    'Check-out: ${todayRecord.checkOutTime ?? "-"}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.secondary,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    todayRecord.checkOutCoordinatesShort.isNotEmpty
+                                        ? todayRecord.checkOutCoordinatesShort
+                                        : todayRecord.coordinatesShort,
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontFamily: 'monospace',
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -413,14 +502,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // Locked button
+                        // Locked Completed Button
                         SizedBox(
                           width: double.infinity,
                           height: 48,
                           child: ElevatedButton.icon(
                             onPressed: null,
                             icon: const Icon(Icons.task_alt, size: 18),
-                            label: const Text('Sudah Presensi Hari Ini'),
+                            label: const Text('Presensi Hari Ini Selesai'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.surfaceLow,
                               foregroundColor: AppColors.textSecondary,
@@ -433,8 +522,85 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
+                      ] else if (isCheckedIn && !hasCheckedOut && todayRecord != null) ...[
+                        // State 2: Checked-in, ready to Check-out
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryContainer.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.successBorder),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.check_circle, size: 16, color: AppColors.primary),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Check-in: ${todayRecord.checkInTime}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    todayRecord.coordinatesShort,
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontFamily: 'monospace',
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Shift sedang berlangsung. Tekan Check-out saat jam pulang.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Active Check-out Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: _startCheckOutFlow,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.logout, size: 20),
+                                SizedBox(width: 10),
+                                Text(
+                                  'Catat Presensi Pulang (Check-out)',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ] else ...[
-                        // Ready to Check In
+                        // State 1: Ready to Check In
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
@@ -461,7 +627,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 18),
 
-                        // Action Button
+                        // Action Button Check In
                         SizedBox(
                           width: double.infinity,
                           height: 52,
@@ -480,7 +646,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Icon(Icons.how_to_reg, size: 20),
                                 SizedBox(width: 10),
                                 Text(
-                                  'Catat Presensi Sekarang',
+                                  'Catat Presensi Masuk (Check-in)',
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,

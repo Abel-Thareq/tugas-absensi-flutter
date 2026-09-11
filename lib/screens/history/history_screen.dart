@@ -165,12 +165,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final item = history[index];
+        final hasCheckedOut = item.hasCheckedOut;
 
         return Container(
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(
+              color: hasCheckedOut ? AppColors.border : AppColors.accent.withValues(alpha: 0.3),
+            ),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Column(
@@ -190,18 +193,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                     decoration: BoxDecoration(
-                      color: AppColors.successBackground,
+                      color: hasCheckedOut ? AppColors.successBackground : AppColors.primaryContainer,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppColors.successBorder),
+                      border: Border.all(
+                        color: hasCheckedOut ? AppColors.successBorder : AppColors.accent.withValues(alpha: 0.3),
+                      ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.check, size: 12, color: AppColors.primary),
-                        SizedBox(width: 4),
+                        Icon(
+                          hasCheckedOut ? Icons.check : Icons.access_time,
+                          size: 12,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 4),
                         Text(
-                          'Hadir',
-                          style: TextStyle(
+                          hasCheckedOut ? 'Selesai' : 'Sedang Bekerja',
+                          style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             color: AppColors.primary,
@@ -212,40 +221,102 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
 
+              // Timestamps Row: Masuk & Pulang
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLow,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.login, size: 14, color: AppColors.primary),
+                          const SizedBox(width: 6),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Masuk',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                item.checkInTime,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLow,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.logout,
+                            size: 14,
+                            color: hasCheckedOut ? AppColors.secondary : AppColors.textTertiary,
+                          ),
+                          const SizedBox(width: 6),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Pulang',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                hasCheckedOut ? item.checkOutTime! : '--:--',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: hasCheckedOut ? AppColors.textPrimary : AppColors.textTertiary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // GPS Coordinates
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.schedule, size: 14, color: AppColors.textSecondary),
-                      const SizedBox(width: 5),
-                      Text(
-                        item.checkInTime,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        '•  Tepat Waktu',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
                       const Icon(Icons.pin_drop, size: 13, color: AppColors.accent),
                       const SizedBox(width: 4),
                       Text(
-                        item.coordinatesShort,
+                        'GPS Masuk: ${item.coordinatesShort}',
                         style: const TextStyle(
                           fontSize: 11,
                           fontFamily: 'monospace',
@@ -254,6 +325,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ],
                   ),
+                  if (hasCheckedOut && item.checkOutCoordinatesShort.isNotEmpty)
+                    Text(
+                      'Pulang: ${item.checkOutCoordinatesShort}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                 ],
               ),
             ],

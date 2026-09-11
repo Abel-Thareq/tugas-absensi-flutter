@@ -5,11 +5,13 @@ import '../../models/attendance_model.dart';
 class CheckInSuccessDialog extends StatelessWidget {
   final AttendanceModel attendance;
   final VoidCallback onViewHistory;
+  final bool isCheckOut;
 
   const CheckInSuccessDialog({
     super.key,
     required this.attendance,
     required this.onViewHistory,
+    this.isCheckOut = false,
   });
 
   @override
@@ -36,14 +38,14 @@ class CheckInSuccessDialog extends StatelessWidget {
               ),
               child: const Icon(
                 Icons.check,
-                color: AppColors.success,
+                color: AppColors.primary,
                 size: 28,
               ),
             ),
             const SizedBox(height: 16),
 
             Text(
-              'Attendance recorded',
+              isCheckOut ? 'Check-out Berhasil' : 'Presensi Masuk Berhasil',
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -70,7 +72,7 @@ class CheckInSuccessDialog extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Check-in',
+                        'Jam Check-in',
                         style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                       ),
                       Text(
@@ -83,20 +85,40 @@ class CheckInSuccessDialog extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (isCheckOut && attendance.checkOutTime != null) ...[
+                    const Divider(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Jam Check-out',
+                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        ),
+                        Text(
+                          attendance.checkOutTime!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const Divider(height: 16),
-                  const Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Location',
+                      const Text(
+                        'Status Verifikasi GPS',
                         style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                       ),
                       Text(
-                        'Recorded',
-                        style: TextStyle(
+                        'Terverifikasi Valid',
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.success,
+                          color: AppColors.primary,
                         ),
                       ),
                     ],
@@ -105,31 +127,14 @@ class CheckInSuccessDialog extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Latitude',
-                        style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      Text(
+                        isCheckOut ? 'Koordinat Pulang' : 'Koordinat Masuk',
+                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                       ),
                       Text(
-                        attendance.latitude.toStringAsFixed(6),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Longitude',
-                        style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                      ),
-                      Text(
-                        attendance.longitude.toStringAsFixed(6),
+                        isCheckOut && attendance.checkOutCoordinatesShort.isNotEmpty
+                            ? attendance.checkOutCoordinatesShort
+                            : attendance.coordinatesShort,
                         style: const TextStyle(
                           fontSize: 12,
                           fontFamily: 'monospace',
@@ -150,12 +155,12 @@ class CheckInSuccessDialog extends StatelessWidget {
                 Navigator.of(context).pop();
                 onViewHistory();
               },
-              child: const Text('View attendance history'),
+              child: const Text('Lihat Riwayat Presensi'),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Done'),
+              child: const Text('Tutup'),
             ),
           ],
         ),
